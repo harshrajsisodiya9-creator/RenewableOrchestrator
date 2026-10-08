@@ -1,0 +1,82 @@
+solar_farms:
+  - id: S1
+    capacity_mw: 100
+  - id: S2
+    capacity_mw: 80
+  - id: S3
+    capacity_mw: 60
+  - id: S4
+    capacity_mw: 50
+  - id: S5
+    capacity_mw: 40
+
+wind_farms:
+  - id: W1
+    capacity_mw: 100
+  - id: W2
+    capacity_mw: 75
+  - id: W3
+    capacity_mw: 50
+
+solar:
+  total_capacity_mw: 330
+  sunrise_hour: 6.0
+  sunset_hour: 18.5
+  peak_capacity_factor: 0.85
+  forecast_error_pct: 0.08
+
+wind:
+  total_capacity_mw: 225
+  base_speed_ms: 8.0
+  evening_speed_ms: 10.4
+  cut_in_ms: 3.0
+  rated_ms: 12.0
+  cut_out_ms: 25.0
+  forecast_speed_error_ms: 1.5
+
+battery:
+  capacity_mwh: 400
+  max_charge_mw: 150
+  max_discharge_mw: 150
+  soc_min_pct: 10
+  soc_max_pct: 90
+  soc_init_pct: 50
+
+factories:
+  - id: A
+    priority: critical
+    base_mw: 60
+    day_mw: 80
+    start_hour: 0
+    end_hour: 24
+  - id: B
+    priority: standard
+    base_mw: 30
+    day_mw: 50
+    start_hour: 8
+    end_hour: 20
+  - id: C
+    priority: interruptible
+    base_mw: 20
+    day_mw: 30
+    start_hour: 9
+    end_hour: 17
+  - id: D
+    priority: shiftable
+    base_mw: 15
+    day_mw: 25
+    start_hour: 7
+    end_hour: 19
+
+grid:
+  line_limit_mw: 150
+  buy_premium_per_kwh: 0.50
+  price_cap_per_kwh: 10.0
+  emission_tco2_per_mwh: 0.71
+
+defaults:
+  mode: reliability
+  reserve_floor_pct: 20.0
+  carbon_price_per_tonne: 500.0
+  curtail_penalty_per_kwh: 0.30
+  seed: 42

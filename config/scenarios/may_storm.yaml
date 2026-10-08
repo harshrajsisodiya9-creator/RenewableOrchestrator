@@ -1,0 +1,31 @@
+cloud_events:
+  - id: cloud_s4s5_afternoon
+    farms: [S4, S5]
+    start: "13:00"
+    end: "14:30"
+    output_factor: 0.3
+    forecast_visible: false
+
+storm_events:
+  - id: may_storm_1
+    alert_time: "15:00"
+    storm_start: "19:30"
+    storm_end: "21:30"
+    wind_speed_ms: 28.0
+    line_limit_mw: 100
+    notice: >
+      Severe thunderstorm warning. Sustained winds 28 m/s expected
+      19:30–21:30. Transmission derated to 100 MW.
+
+maintenance_windows:
+  - id: maint_w3_blade
+    asset: W3
+    kind: scheduled
+    start: "10:00"
+    end: "13:00"
+
+  - id: maint_w1_gearbox
+    asset: W1
+    kind: scheduled
+    start: "18:00"
+    end: "20:00"
