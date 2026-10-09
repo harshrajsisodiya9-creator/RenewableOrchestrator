@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+from sqlalchemy import Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from api.database import Base
+
+
+class Project(Base):
+    __tablename__ = "project"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+    solar_farms: Mapped[list[SolarFarm]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    wind_farms: Mapped[list[WindFarm]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    batteries: Mapped[list[Battery]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    factories: Mapped[list[Factory]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    grids: Mapped[list[Grid]] = relationship(back_populates="project", cascade="all, delete-orphan")
+
+
+class SolarFarm(Base):
+    __tablename__ = "solar_farm"
+    __table_args__ = (
+        UniqueConstraint("farm_id", "project_id", name="uq_solar_project"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    farm_id: Mapped[str] = mapped_column(String, nullable=False)
+    power_output_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+
+    project: Mapped[Project] = relationship(back_populates="solar_farms")
+
+
+class WindFarm(Base):
+    __tablename__ = "wind_farm"
+    __table_args__ = (
+        UniqueConstraint("farm_id", "project_id", name="uq_wind_project"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    farm_id: Mapped[str] = mapped_column(String, nullable=False)
+    power_output_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+
+    project: Mapped[Project] = relationship(back_populates="wind_farms")
+
+
+class Battery(Base):
+    __tablename__ = "battery"
+    __table_args__ = (
+        UniqueConstraint("battery_id", "project_id", name="uq_battery_project"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    battery_id: Mapped[str] = mapped_column(String, nullable=False)
+    total_capacity_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    charge_discharge_rate_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+
+    project: Mapped[Project] = relationship(back_populates="batteries")
+
+
+class Factory(Base):
+    __tablename__ = "factory"
+    __table_args__ = (
+        UniqueConstraint("factory_id", "project_id", name="uq_factory_project"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    factory_id: Mapped[str] = mapped_column(String, nullable=False)
+    priority: Mapped[str] = mapped_column(String, nullable=False)
+    base_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    day_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    start_hour: Mapped[float] = mapped_column(Float, nullable=False)
+    end_hour: Mapped[float] = mapped_column(Float, nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+
+    project: Mapped[Project] = relationship(back_populates="factories")
+
+
+class Grid(Base):
+    __tablename__ = "grid"
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    line_limit_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    buy_premium_per_kwh: Mapped[float] = mapped_column(Float, nullable=False)
+    price_cap_per_kwh: Mapped[float] = mapped_column(Float, nullable=False)
+    emission_tco2_per_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+
+    project: Mapped[Project] = relationship(back_populates="grids")
