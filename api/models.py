@@ -91,3 +91,21 @@ class Grid(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
 
     project: Mapped[Project] = relationship(back_populates="grids")
+
+
+class AssetStatus(Base):
+    __tablename__ = "asset_status"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id", "asset_type", "asset_id", name="uq_asset_status"
+        ),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+    asset_type: Mapped[str] = mapped_column(String, nullable=False)
+    asset_id: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="online")
+    tripped_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    restore_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)

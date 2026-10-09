@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from typing import Literal
+
 from pydantic import BaseModel, field_validator
 
 
@@ -68,6 +70,23 @@ class GridCreate(BaseModel):
     price_cap_per_kwh: float
     emission_tco2_per_mwh: float
     project_name: str
+
+
+class InjectRequest(BaseModel):
+    asset_type: Literal["solar", "wind", "battery"]
+    asset_id: str
+    action: Literal["trip", "restore"]
+    duration_ticks: int | None = None
+    project_name: str
+
+
+class InjectResponse(BaseModel):
+    asset_type: str
+    asset_id: str
+    status: str
+    tripped_at: int | None
+    restore_at: int | None
+    message: str
 
 
 # ── response schemas ─────────────────────────────────────────────────────

@@ -1,0 +1,25 @@
+solar:
+  sunrise_hour: 6.0
+  sunset_hour: 18.5
+  peak_capacity_factor: 0.85
+  forecast_error_pct: 0.08
+
+wind:
+  base_speed_ms: 8.0
+  evening_speed_ms: 10.4
+  cut_in_ms: 3.0
+  rated_ms: 12.0
+  cut_out_ms: 25.0
+  forecast_speed_error_ms: 1.5
+
+battery:
+  soc_min_pct: 10
+  soc_max_pct: 90
+  soc_init_pct: 50
+
+defaults:
+  mode: reliability
+  reserve_floor_pct: 20.0
+  carbon_price_per_tonne: 500.0
+  curtail_penalty_per_kwh: 0.30
+  seed: 42

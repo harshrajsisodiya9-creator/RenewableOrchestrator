@@ -4,7 +4,7 @@ from __future__ import annotations
 import yaml
 
 from api.database import Base, SessionLocal, engine
-from api.models import Battery, Factory, Grid, Project, SolarFarm, WindFarm
+from api.models import AssetStatus, Battery, Factory, Grid, Project, SolarFarm, WindFarm
 
 
 def seed(yaml_path: str, project_name: str) -> None:
@@ -62,6 +62,28 @@ def seed(yaml_path: str, project_name: str) -> None:
                 price_cap_per_kwh=grid["price_cap_per_kwh"],
                 emission_tco2_per_mwh=grid["emission_tco2_per_mwh"],
                 project_id=project.id,
+            ))
+
+        for sf in cfg.get("solar_farms", []):
+            db.add(AssetStatus(
+                project_id=project.id,
+                asset_type="solar",
+                asset_id=sf["id"],
+                status="online",
+            ))
+        for wf in cfg.get("wind_farms", []):
+            db.add(AssetStatus(
+                project_id=project.id,
+                asset_type="wind",
+                asset_id=wf["id"],
+                status="online",
+            ))
+        if bat:
+            db.add(AssetStatus(
+                project_id=project.id,
+                asset_type="battery",
+                asset_id="B1",
+                status="online",
             ))
 
         db.commit()

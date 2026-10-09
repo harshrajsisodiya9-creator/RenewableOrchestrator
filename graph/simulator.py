@@ -223,17 +223,25 @@ class Simulator:
                 self._wind_truth[t] = total_cap * pf
 
     def _apply_maintenance(self) -> None:
-        farm_caps = {f["id"]: f["capacity_mw"] for f in self._wind_farms}
-        total_cap = self._wind["total_capacity_mw"]
+        wind_caps = {f["id"]: f["capacity_mw"] for f in self._wind_farms}
+        solar_caps = {f["id"]: f["capacity_mw"] for f in self._solar_farms}
+        wind_total = self._wind["total_capacity_mw"]
+        solar_total = self._solar["total_capacity_mw"]
+
         for mw in self._maint_windows:
             t0 = _hhmm_to_tick(mw["start"])
             t1 = _hhmm_to_tick(mw["end"])
-            lost_cap = farm_caps.get(mw["asset"], 0)
-            if total_cap == 0:
-                continue
-            factor = 1 - lost_cap / total_cap
-            for t in range(t0, min(t1, TOTAL_TICKS)):
-                self._wind_truth[t] *= factor
+            asset = mw["asset"]
+
+            if asset in wind_caps and wind_total > 0:
+                factor = 1 - wind_caps[asset] / wind_total
+                for t in range(t0, min(t1, TOTAL_TICKS)):
+                    self._wind_truth[t] *= factor
+
+            elif asset in solar_caps and solar_total > 0:
+                factor = 1 - solar_caps[asset] / solar_total
+                for t in range(t0, min(t1, TOTAL_TICKS)):
+                    self._solar_truth[t] *= factor
 
     # ── forecasts ─────────────────────────────────────────────────────────
 

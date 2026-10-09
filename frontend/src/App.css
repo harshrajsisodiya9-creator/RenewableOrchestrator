@@ -1,0 +1,305 @@
+/* ── reset & base ─────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --border: #dde1e6;
+  --text: #1a1a2e;
+  --text-muted: #6b7280;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --green: #16a34a;
+  --red: #dc2626;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* ── app shell ────────────────────────────────────────────── */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background: var(--accent);
+  color: #fff;
+  padding: 16px 24px;
+}
+
+.app-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.app-main {
+  display: flex;
+  flex: 1;
+  gap: 0;
+  padding: 24px;
+}
+
+/* ── left panel (form) ────────────────────────────────────── */
+.panel-form {
+  width: 33.333%;
+  min-width: 320px;
+  flex-shrink: 0;
+  padding-right: 24px;
+  border-right: 1px solid var(--border);
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+/* ── right panel (table) ──────────────────────────────────── */
+.panel-table {
+  flex: 1;
+  padding-left: 24px;
+  overflow-x: auto;
+}
+
+/* ── form styles ──────────────────────────────────────────── */
+.project-form h2 {
+  font-size: 1.15rem;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.project-form > label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.project-form > label input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.project-form input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.project-form input:focus {
+  border-color: var(--accent);
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+fieldset legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0 6px;
+  color: var(--text);
+}
+
+.inline-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.inline-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.inline-row.three-col input:first-child {
+  flex: 0.7;
+}
+
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-icon.remove {
+  background: #fee2e2;
+  color: var(--red);
+}
+
+.btn-icon.remove:hover {
+  background: #fecaca;
+}
+
+.btn-add {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: var(--accent);
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-add:hover {
+  background: #eff6ff;
+  border-color: var(--accent);
+}
+
+.grid-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.grid-fields label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.grid-fields input {
+  width: 100%;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: var(--red);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+/* ── table styles ─────────────────────────────────────────── */
+.table-container h2 {
+  font-size: 1.15rem;
+  margin-bottom: 16px;
+}
+
+.table-loading,
+.table-empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+thead {
+  background: var(--bg);
+}
+
+th {
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+tbody tr:hover {
+  background: #f0f5ff;
+}
+
+.cell-name {
+  font-weight: 600;
+}
+
+.cell-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ── responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .app-main {
+    flex-direction: column;
+  }
+
+  .panel-form {
+    width: 100%;
+    min-width: 0;
+    padding-right: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 24px;
+    max-height: none;
+  }
+
+  .panel-table {
+    padding-left: 0;
+  }
+}

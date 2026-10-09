@@ -142,5 +142,8 @@ class State(TypedDict, total=False):
     violations: list[Violation]  # what was corrected and why
     retry_count: int  # times optimizer was re-invoked
 
+    # ── Asset status (DB mode) ───────────────────────────────────────────
+    asset_statuses: list[dict]  # [{asset_type, asset_id, status, ...}]
+
     # ── Logger output ─────────────────────────────────────────────────────
     tick_log: list[dict]  # accumulated per-tick records

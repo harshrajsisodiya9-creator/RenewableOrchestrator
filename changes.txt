@@ -1,0 +1,150 @@
+CHANGES — PostgreSQL Integration + Asset Status Injection
+==========================================================
+
+NEW FILES
+---------
+
+1. config/physics_defaults.yaml
+   Physics constants (sunrise/sunset, wind cut-in/rated/cut-out, battery
+   SOC limits, default mode/reserve/carbon params). Used by the DB config
+   loader since these don't live in PostgreSQL.
+
+2. graph/db_config_loader.py
+   Reads project assets from PostgreSQL (solar farms, wind farms, battery,
+   factories, grid) and builds the same config dict that load_config()
+   returns from YAML, so the Simulator can be created from either source.
+
+3. graph/asset_status.py
+   CRUD functions for the asset_status table: read, trip, restore,
+   auto-restore expired trips, and seed initial "online" rows.
+
+4. graph/run_state.py
+   Thread-safe singleton that shares the current tick number between
+   the graph loop thread and the FastAPI server thread.
+
+5. api/routes/inject.py
+   POST /inject endpoint — trip or restore an asset at runtime.
+   Request: {asset_type, asset_id, action: trip|restore, duration_ticks, project_name}
+   The graph picks up the change on the next tick.
+
+6. run_server.py
+   Combined launcher: FastAPI server (uvicorn) + graph simulation loop
+   in a background thread. Also adds GET /status and POST /start endpoints.
+
+MODIFIED FILES
+--------------
+
+7. api/models.py
+   Added AssetStatus SQLAlchemy model (asset_status table with project_id,
+   asset_type, asset_id, status, tripped_at, restore_at, reason).
+
+8. api/schemas.py
+   Added InjectRequest and InjectResponse Pydantic models.
+
+9. api/main.py
+   Registered the inject router.
+
+10. api/seed.py
+    Seeds asset_status rows (all "online") alongside existing asset seeding.
+
+11. graph/models/state.py
+    Added asset_statuses field to the State TypedDict.
+
+12. graph/nodes/data_collector.py
+    In DB mode: after simulator.observe(), reads asset statuses from DB,
+    zeroes out tripped solar/wind farms (scales MW + forecast), freezes
+    battery if tripped (max_charge/discharge = 0). Also runs auto-restore
+    for expired trips.
+
+13. graph/nodes/monitor.py
+    Added "anchored snapshot" — remembers asset statuses at each supervisor
+    call. If any asset's status differs from the snapshot, fires an
+    asset_status_changed trigger to invoke the supervisor.
+
+    Also added two new trigger families to close monitor blind spots:
+
+    a) Anchored drift detection — anchors solar_mw, wind_mw, demand_mw,
+       and battery_soc_pct at each supervisor call. If any value drifts
+       >25 MW (or >10% SOC) from its anchor, triggers supervisor. Catches
+       slow creep that per-tick comparison misses.
+
+    b) Aggregate headroom gap — computes supply-demand headroom:
+       (renewables + discharge capacity + grid limit) - (demand + reserve).
+       Checked at the current tick and projected up to 4 intervals ahead
+       using forecasts. Triggers when headroom drops below 20 MW buffer.
+       Catches correlated small changes across multiple signals that
+       individually stay below thresholds.
+
+    Monitor now covers all four trigger families:
+      1. Per-signal anchored drift (solar, wind, demand, SOC)
+      2. Discrete events (storm, maintenance, asset status change)
+      3. Aggregate headroom gap (now + forecast lookahead)
+      4. Staleness-timer backstop (routine review every 3h)
+
+14. run.py
+    Added DATA_SOURCE env var check. When "db": loads config from PostgreSQL,
+    seeds asset statuses, inits DB-mode data collector, updates run_state
+    each tick.
+
+15. .env
+    Added DATA_SOURCE=simulator (default).
+
+16. requirements.txt
+    Added pydantic>=2.0.
+
+BUG FIXES — Asset Availability During Maintenance / Trip
+---------------------------------------------------------
+
+17. graph/simulator.py — _apply_maintenance (Bug Fix)
+    BEFORE: Only built a wind farm capacity map and only reduced _wind_truth.
+    Maintenance windows targeting solar farms (or batteries) were silently
+    ignored — the solar farm still produced at full capacity during its
+    scheduled maintenance.
+    AFTER: Builds both solar and wind capacity maps, checks which asset type
+    the maintenance window targets, and reduces the correct truth array.
+
+18. graph/nodes/data_collector.py — _apply_asset_statuses (Bug Fix)
+    BEFORE: Any single tripped battery zeroed ALL battery charge/discharge
+    rates, but left battery_capacity_mwh, battery_energy_mwh, and min/max
+    energy untouched. The optimizer computed reserve_target from the full
+    capacity of an unavailable battery, adding phantom shortfall penalties
+    and skewing buy/sell decisions.
+    AFTER: Counts tripped vs total batteries, computes an online_ratio, and
+    proportionally scales all six battery fields (capacity, energy, min/max
+    energy, charge rate, discharge rate). One tripped battery out of two
+    halves capacity instead of killing it entirely.
+
+    Also added grid/transmission handling: if a "grid" asset is tripped,
+    line_limit_mw is set to 0, preventing the optimizer from planning any
+    grid buy/sell while the transmission line is unavailable.
+
+19. graph/db_config_loader.py — battery loading (Bug Fix)
+    BEFORE: Fetched only the first battery (query.first()) and did not
+    expose battery IDs to callers.
+    AFTER: Fetches all batteries, sums capacity and charge/discharge rates,
+    and stores battery IDs as cfg["battery_ids"] so they can be individually
+    tracked and tripped.
+
+20. run.py + run_server.py — battery ID seeding (Bug Fix)
+    BEFORE: Hardcoded ["B1"] — only B1 got an asset_status row. Other
+    batteries (B2, B3, …) could never be tripped, and attempting to trip
+    them raised a ValueError.
+    AFTER: Reads battery IDs from cfg["battery_ids"] so every battery in
+    the project gets a status row.
+
+21. graph/asset_status.py — seed_asset_statuses (Bug Fix)
+    BEFORE: Only seeded solar, wind, and battery asset types.
+    AFTER: Also seeds a "grid" asset type (default ID "grid") so the
+    transmission line can be tripped/restored via the /inject endpoint.
+
+22. graph/nodes/monitor.py — maintenance trigger (Bug Fix)
+    BEFORE: Only fired maintenance_approaching when a window was "pending"
+    and within the 3-hour lookahead. The supervisor was never notified when
+    maintenance actually began.
+    AFTER: Also fires maintenance_started on the exact tick a window becomes
+    "active", so the supervisor can react to the asset actually going offline.
+
+NOT CHANGED
+-----------
+optimizer.py, supervisor.py, validator.py, executor.py, logger.py,
+graph.py — these consume already-masked state fields and work unchanged.
