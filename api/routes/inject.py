@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from api.database import get_db
-from api.models import Battery, Project, SolarFarm, WindFarm
+from api.models import AssetStatus, Battery, Grid, Project, SolarFarm, WindFarm
 from api.schemas import InjectRequest, InjectResponse
 from graph.asset_status import restore_asset, trip_asset
 from graph.run_state import run_state
@@ -26,23 +26,36 @@ def inject_fault(body: InjectRequest, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(404, f"Project '{body.project_name}' not found")
 
-    model, id_col = _ASSET_TABLE.get(body.asset_type, (None, None))
-    if model is None:
-        raise HTTPException(400, f"Invalid asset_type '{body.asset_type}'")
+    if body.asset_type == "grid":
+        status_row = (
+            db.query(AssetStatus)
+            .filter(
+                AssetStatus.project_id == project.id,
+                AssetStatus.asset_type == "grid",
+                AssetStatus.asset_id == body.asset_id,
+            )
+            .first()
+        )
+        if not status_row:
+            raise HTTPException(404, f"Grid asset '{body.asset_id}' not found in project '{body.project_name}'")
+    else:
+        model, id_col = _ASSET_TABLE.get(body.asset_type, (None, None))
+        if model is None:
+            raise HTTPException(400, f"Invalid asset_type '{body.asset_type}'")
 
-    asset = (
-        db.query(model)
-        .filter(
-            getattr(model, id_col) == body.asset_id,
-            model.project_id == project.id,
+        asset = (
+            db.query(model)
+            .filter(
+                getattr(model, id_col) == body.asset_id,
+                model.project_id == project.id,
+            )
+            .first()
         )
-        .first()
-    )
-    if not asset:
-        raise HTTPException(
-            404,
-            f"{body.asset_type} asset '{body.asset_id}' not found in project '{body.project_name}'",
-        )
+        if not asset:
+            raise HTTPException(
+                404,
+                f"{body.asset_type} asset '{body.asset_id}' not found in project '{body.project_name}'",
+            )
 
     current_tick = run_state.get_tick()
 

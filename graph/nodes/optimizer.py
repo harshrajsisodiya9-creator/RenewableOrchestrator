@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import logging
+
 from graph.models.state import Action, Forecast, State
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+log = logging.getLogger("optimizer")
 
 DT = 0.25  # hours per tick
 
 # cost constants (₹/MWh)
-WEAR_COST = 500.0            # 0.50 ₹/kWh
-UNMET_PENALTY = 50_000.0     # 50 ₹/kWh — must always exceed any possible buy cost
+WEAR_COST = 500.0  # 0.50 ₹/kWh
+UNMET_PENALTY = 50_000.0  # 50 ₹/kWh — must always exceed any possible buy cost
 SHORTFALL_PENALTY = 5_000.0  # 5 ₹/kWh
-TERMINAL_BONUS = 10.0        # ₹/MWh stored at horizon end
-TEMPORAL_DISCOUNT = 0.85     # per-interval decay on unmet/shortfall penalties
+TERMINAL_BONUS = 10.0  # ₹/MWh stored at horizon end
+TEMPORAL_DISCOUNT = 0.85  # per-interval decay on unmet/shortfall penalties
 
 
 def _forecast_values(fc: Forecast | None, n: int) -> list[float]:
@@ -24,11 +32,13 @@ def _forecast_values(fc: Forecast | None, n: int) -> list[float]:
 def _solve_lp(state: State) -> Action | None:
     """Formulate and solve the 6-hour-ahead LP. Returns None on failure."""
     try:
-        from scipy.optimize import linprog
         import numpy as np
+        from scipy.optimize import linprog
     except ImportError:
+        log.error("scipy/numpy not available — LP solver unavailable")
         return None
 
+    tick = state.get("tick", 0)
     N = 24  # forecast horizon intervals
 
     solar_fc = _forecast_values(state.get("solar_forecast"), N)
@@ -59,6 +69,23 @@ def _solve_lp(state: State) -> Action | None:
     line_lim = state.get("line_limit_mw", 150.0)
     reserve_target = state.get("reserve_target_pct", 20.0) / 100.0 * capacity
 
+    log.info(
+        "tick=%d  LP inputs  solar[0]=%.1f MW  wind[0]=%.1f MW  demand[0]=%.1f MW  "
+        "price[0]=%.2f ₹/kWh  battery=%.1f/%.0f MWh  max_chg=%.0f MW  max_dis=%.0f MW  "
+        "line=%.0f MW  reserve_target=%.1f MWh",
+        tick,
+        solar_fc[0],
+        wind_fc[0],
+        demand_fc[0],
+        price_fc[0],
+        e0,
+        capacity,
+        max_chg,
+        max_dis,
+        line_lim,
+        reserve_target,
+    )
+
     buy_premium = 500.0  # 0.50 ₹/kWh in ₹/MWh
     carbon_rate = state.get("carbon_price_per_tonne", 500.0) * 0.71
     curtail_pen = state.get("curtail_penalty_per_kwh", 0.30) * 1000.0
@@ -74,35 +101,35 @@ def _solve_lp(state: State) -> Action | None:
     c = np.zeros(NVARS)
     for t in range(N):
         p_mwh = price_fc[t] * 1000.0  # ₹/kWh → ₹/MWh
-        decay = TEMPORAL_DISCOUNT ** t
-        c[idx(0, t)] = WEAR_COST * DT                               # charge
-        c[idx(1, t)] = WEAR_COST * DT                               # discharge
-        c[idx(2, t)] = (p_mwh + buy_premium + carbon_rate) * DT     # buy
-        c[idx(3, t)] = -p_mwh * DT                                  # sell (income)
-        c[idx(4, t)] = curtail_pen * DT                              # curtail
-        c[idx(5, t)] = UNMET_PENALTY * DT * decay                   # unmet
-        c[idx(6, t)] = SHORTFALL_PENALTY * DT * decay                # shortfall
+        decay = TEMPORAL_DISCOUNT**t
+        c[idx(0, t)] = WEAR_COST * DT  # charge
+        c[idx(1, t)] = WEAR_COST * DT  # discharge
+        c[idx(2, t)] = (p_mwh + buy_premium + carbon_rate) * DT  # buy
+        c[idx(3, t)] = -p_mwh * DT  # sell (income)
+        c[idx(4, t)] = curtail_pen * DT  # curtail
+        c[idx(5, t)] = UNMET_PENALTY * DT * decay  # unmet
+        c[idx(6, t)] = SHORTFALL_PENALTY * DT * decay  # shortfall
     # terminal bonus for stored energy at end of horizon
     c[idx(7, N - 1)] = -TERMINAL_BONUS
 
     # ── bounds ────────────────────────────────────────────────────────────
     bounds: list[tuple[float, float]] = []
     for t in range(N):
-        bounds.append((0, max_chg))                   # charge
+        bounds.append((0, max_chg))  # charge
     for t in range(N):
-        bounds.append((0, max_dis))                    # discharge
+        bounds.append((0, max_dis))  # discharge
     for t in range(N):
-        bounds.append((0, line_lim))                   # buy
+        bounds.append((0, line_lim))  # buy
     for t in range(N):
-        bounds.append((0, line_lim))                   # sell
+        bounds.append((0, line_lim))  # sell
     for t in range(N):
-        bounds.append((0, max(0, renewables[t])))      # curtail
+        bounds.append((0, max(0, renewables[t])))  # curtail
     for t in range(N):
-        bounds.append((0, max(0, demand_fc[t])))       # unmet
+        bounds.append((0, max(0, demand_fc[t])))  # unmet
     for t in range(N):
-        bounds.append((0, capacity))                   # shortfall
+        bounds.append((0, capacity))  # shortfall
     for t in range(N):
-        bounds.append((e_min, e_max))                  # energy
+        bounds.append((e_min, e_max))  # energy
 
     # ── equality constraints ──────────────────────────────────────────────
     # 1) energy balance:
@@ -117,19 +144,19 @@ def _solve_lp(state: State) -> Action | None:
 
     for t in range(N):
         row = t
-        A_eq[row, idx(0, t)] = -1   # charge
-        A_eq[row, idx(1, t)] = 1    # discharge
-        A_eq[row, idx(2, t)] = 1    # buy
-        A_eq[row, idx(3, t)] = -1   # sell
-        A_eq[row, idx(4, t)] = -1   # curtail
-        A_eq[row, idx(5, t)] = 1    # unmet
+        A_eq[row, idx(0, t)] = -1  # charge
+        A_eq[row, idx(1, t)] = 1  # discharge
+        A_eq[row, idx(2, t)] = 1  # buy
+        A_eq[row, idx(3, t)] = -1  # sell
+        A_eq[row, idx(4, t)] = -1  # curtail
+        A_eq[row, idx(5, t)] = 1  # unmet
         b_eq[row] = demand_fc[t] - renewables[t]
 
     for t in range(N):
         row = N + t
-        A_eq[row, idx(7, t)] = 1           # energy[t]
-        A_eq[row, idx(0, t)] = -DT         # -charge*dt
-        A_eq[row, idx(1, t)] = DT          # +discharge*dt
+        A_eq[row, idx(7, t)] = 1  # energy[t]
+        A_eq[row, idx(0, t)] = -DT  # -charge*dt
+        A_eq[row, idx(1, t)] = DT  # +discharge*dt
         if t == 0:
             b_eq[row] = e0
         else:
@@ -147,12 +174,37 @@ def _solve_lp(state: State) -> Action | None:
         b_ub[t] = -reserve_target
 
     # ── solve ─────────────────────────────────────────────────────────────
-    result = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
-                     bounds=bounds, method="highs",
-                     options={"presolve": True, "time_limit": 2.0})
+    log.debug(
+        "tick=%d  LP formulation: %d vars, %d eq constraints, %d ub constraints",
+        tick,
+        NVARS,
+        n_eq,
+        N,
+    )
+
+    result = linprog(
+        c,
+        A_ub=A_ub,
+        b_ub=b_ub,
+        A_eq=A_eq,
+        b_eq=b_eq,
+        bounds=bounds,
+        method="highs",
+        options={"presolve": True, "time_limit": 2.0},
+    )
 
     if not result.success:
+        log.warning(
+            "tick=%d  LP failed  status=%d  message=%s",
+            tick,
+            result.status,
+            result.message,
+        )
         return None
+
+    log.info(
+        "tick=%d  LP solved  obj=%.0f  iterations=%d", tick, result.fun, result.nit
+    )
 
     x = result.x
     return Action(
@@ -167,6 +219,7 @@ def _solve_lp(state: State) -> Action | None:
 
 def _fallback_dispatch(state: State) -> Action:
     """Simple rule-based dispatch when LP is unavailable or infeasible."""
+    tick = state.get("tick", 0)
     solar = state.get("solar_mw", 0.0)
     wind = state.get("wind_mw", 0.0)
     demand = state.get("demand_mw", 0.0)
@@ -198,7 +251,7 @@ def _fallback_dispatch(state: State) -> Action:
         deficit -= buy
         unmet = max(0, deficit)
 
-    return Action(
+    action = Action(
         charge=round(charge, 2),
         discharge=round(discharge, 2),
         buy=round(buy, 2),
@@ -206,11 +259,36 @@ def _fallback_dispatch(state: State) -> Action:
         curtail=round(curtail, 2),
         unmet=round(unmet, 2),
     )
+    log.info(
+        "tick=%d  FALLBACK dispatch  charge=%.1f  discharge=%.1f  buy=%.1f  "
+        "sell=%.1f  curtail=%.1f  unmet=%.1f MW",
+        tick,
+        action.charge,
+        action.discharge,
+        action.buy,
+        action.sell,
+        action.curtail,
+        action.unmet,
+    )
+    return action
 
 
 def optimizer(state: State) -> dict:
+    tick = state.get("tick", 0)
     plan = _solve_lp(state)
     if plan is not None:
+        log.info(
+            "tick=%d  OPTIMAL dispatch  charge=%.1f  discharge=%.1f  buy=%.1f  "
+            "sell=%.1f  curtail=%.1f  unmet=%.1f MW",
+            tick,
+            plan.charge,
+            plan.discharge,
+            plan.buy,
+            plan.sell,
+            plan.curtail,
+            plan.unmet,
+        )
         return {"plan": plan, "plan_status": "optimal"}
+    log.warning("tick=%d  LP failed, using fallback dispatch", tick)
     plan = _fallback_dispatch(state)
     return {"plan": plan, "plan_status": "fallback"}

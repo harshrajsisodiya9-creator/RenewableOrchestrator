@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import os
+import re
+import threading
+
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, StateGraph
+from psycopg_pool import ConnectionPool
 
 from graph.models.state import State
 from graph.nodes.data_collector import data_collector
@@ -12,6 +18,33 @@ from graph.nodes.monitor import monitor
 from graph.nodes.optimizer import optimizer
 from graph.nodes.supervisor import supervisor
 from graph.nodes.validator import validator
+
+
+def _pg_conn_string() -> str:
+    url = os.environ.get(
+        "DATABASE_URL",
+        "postgresql+psycopg://postgres:blah123@localhost:5432/energy",
+    )
+    return re.sub(r"^postgresql\+psycopg", "postgresql", url)
+
+
+_checkpointer: PostgresSaver | None = None
+_init_lock = threading.Lock()
+
+
+def get_checkpointer() -> PostgresSaver:
+    global _checkpointer
+    if _checkpointer is not None:
+        return _checkpointer
+    with _init_lock:
+        if _checkpointer is not None:
+            return _checkpointer
+        pool = ConnectionPool(_pg_conn_string(), min_size=1, max_size=5)
+        cp = PostgresSaver(pool)
+        cp.setup()
+        _checkpointer = cp
+        return _checkpointer
+
 
 workflow = StateGraph(State)
 
@@ -53,4 +86,8 @@ workflow.add_conditional_edges(
 workflow.add_edge("executor", "logger")
 workflow.add_edge("logger", END)
 
-graph = workflow.compile()
+
+def compile_graph(use_checkpointer: bool = True):
+    if use_checkpointer:
+        return workflow.compile(checkpointer=get_checkpointer())
+    return workflow.compile()

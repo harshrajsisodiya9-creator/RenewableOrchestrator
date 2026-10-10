@@ -146,5 +146,67 @@ BUG FIXES — Asset Availability During Maintenance / Trip
 
 NOT CHANGED
 -----------
-optimizer.py, supervisor.py, validator.py, executor.py, logger.py,
-graph.py — these consume already-masked state fields and work unchanged.
+optimizer.py, supervisor.py, validator.py, executor.py, logger.py
+— these consume already-masked state fields and work unchanged.
+
+
+MONITOR REFACTOR — State-Based Memory + Postgres Checkpointer
+==============================================================
+
+Goal: eliminate module-level globals from monitor.py so concurrent
+projects don't cross-contaminate. All monitor memory now lives in
+the LangGraph State, persisted by a Postgres-backed checkpointer.
+
+23. graph/models/state.py — MonitorMemory TypedDict + State field
+    Added MonitorMemory TypedDict (total=False) with all fields that
+    previously lived in the _MonitorMemory class: prev_renewables_forecast_mw,
+    seen_alert_ids (list, not set — JSON-serializable), seen_maint_ids,
+    last_supervisor_tick, prev_active_storm, anchored_asset_statuses
+    (dict[str,str] with "type:id" keys instead of tuple keys),
+    anchored_solar_mw, anchored_wind_mw, anchored_demand_mw,
+    anchored_battery_soc_pct.
+    Added monitor_memory: MonitorMemory field to State.
+
+24. graph/nodes/monitor.py — rewrite: no globals
+    Removed _MonitorMemory class, _mem module-level global, and
+    reset_monitor() function entirely.
+    monitor() now reads from state.get("monitor_memory", {}) and returns
+    the updated MonitorMemory dict alongside triggers, so it flows
+    through State like every other field.
+
+25. graph/nodes/monitor.py — headroom unit bug fix
+    BEFORE: reserve_mw = reserve_pct/100 * battery_capacity_mwh — this
+    gives MWh, not MW, then subtracted from demand_mw (MW). Units mismatch.
+    AFTER: computes reserve_energy_mwh, then energy_above_reserve, then
+    available_discharge_mw = min(max_discharge, energy_above_reserve / 0.25).
+    Headroom is now (supply_mw + available_discharge_mw + line_limit) - demand_mw,
+    all in MW.
+
+26. graph/graph.py — Postgres checkpointer (lazy init)
+    Added PostgresSaver backed by a psycopg ConnectionPool. Connection
+    string reuses DATABASE_URL from env (strips SQLAlchemy "+psycopg" dialect).
+    Initialization is lazy (get_checkpointer()) so imports succeed without
+    Postgres. compile_graph(use_checkpointer=True/False) returns the
+    compiled graph with or without checkpointing. setup() creates
+    checkpoint tables on first use.
+
+27. run.py — thread_id + per-project lock + checkpoint cleanup
+    Removed reset_monitor() import and call.
+    In DB mode: acquires per-project lock, deletes old checkpoints
+    (checkpointer.delete_thread) before starting, passes
+    config={"configurable": {"thread_id": str(project_id)}} to
+    graph.invoke(). try/finally ensures lock release and run_state
+    cleanup. Simulator mode: compiles without checkpointer, uses
+    "simulator" thread_id.
+
+28. run_server.py — same changes as run.py
+    Removed reset_monitor() import and call. Added lazy checkpointer,
+    thread_id config, per-project lock, checkpoint cleanup on fresh run.
+
+29. graph/run_state.py — per-project concurrency lock
+    Added acquire_project(project_id) → bool and
+    release_project(project_id) methods using a dict[int, Lock].
+    Only one graph invocation per project can run at a time.
+    Different projects may run concurrently.
+
+30. requirements.txt — added langgraph-checkpoint-postgres>=3.1

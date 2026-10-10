@@ -34,7 +34,7 @@ def executor(state: State) -> dict:
         e_max = state.get("battery_max_energy_mwh", 360.0)
         e_after = max(e_min, min(e_max, e_before + delta_mwh))
 
-    soc_after = e_after / capacity * 100.0
+    soc_after = (e_after / capacity * 100.0) if capacity > 0 else 0.0
 
     # financials (₹): energy in MWh = MW × 0.25h, price in ₹/kWh, × 1000 kW/MW
     buy_cost = action.buy * DT * (price + buy_premium) * 1000.0

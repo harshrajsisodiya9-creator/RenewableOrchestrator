@@ -73,7 +73,7 @@ class GridCreate(BaseModel):
 
 
 class InjectRequest(BaseModel):
-    asset_type: Literal["solar", "wind", "battery"]
+    asset_type: Literal["solar", "wind", "battery", "grid"]
     asset_id: str
     action: Literal["trip", "restore"]
     duration_ticks: int | None = None

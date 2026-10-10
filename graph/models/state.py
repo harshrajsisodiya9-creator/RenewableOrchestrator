@@ -71,6 +71,24 @@ class Violation:
 
 
 # ---------------------------------------------------------------------------
+# Monitor memory (lives in State so concurrent runs are isolated)
+# ---------------------------------------------------------------------------
+
+
+class MonitorMemory(TypedDict, total=False):
+    prev_renewables_forecast_mw: float | None
+    seen_alert_ids: list[str]
+    seen_maint_ids: list[str]
+    last_supervisor_tick: int
+    prev_active_storm: bool
+    anchored_asset_statuses: dict[str, str] | None
+    anchored_solar_mw: float | None
+    anchored_wind_mw: float | None
+    anchored_demand_mw: float | None
+    anchored_battery_soc_pct: float | None
+
+
+# ---------------------------------------------------------------------------
 # LangGraph State  (total=False → every field is optional)
 # ---------------------------------------------------------------------------
 
@@ -126,6 +144,7 @@ class State(TypedDict, total=False):
     # ── Monitor output ────────────────────────────────────────────────────
     should_call_supervisor: bool  # True → route to LLM supervisor
     monitor_triggers: list[str]  # reasons the monitor flagged this tick
+    monitor_memory: MonitorMemory  # persisted across ticks, per-run
 
     # ── Supervisor (LLM) output ───────────────────────────────────────────
     risk_level: str  # "low" | "medium" | "high" | "critical"

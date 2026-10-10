@@ -12,8 +12,7 @@ load_dotenv()
 from graph.simulator import Simulator, load_config
 from graph.nodes.data_collector import init_simulator, init_data_collector_db
 from graph.nodes.executor import init_executor_simulator
-from graph.nodes.monitor import reset_monitor
-from graph.graph import graph
+from graph.graph import compile_graph, get_checkpointer
 from graph.models.state import Action
 
 TICKS = 96
@@ -34,6 +33,11 @@ def run(world_yaml: str = "config/world.yaml",
         cfg = load_config_from_db(project_name or "farm 1")
         project_id = cfg.pop("_project_id")
 
+        if not run_state.acquire_project(project_id):
+            raise RuntimeError(
+                f"Project {project_id} already has an active run"
+            )
+
         seed_asset_statuses(
             project_id,
             [f["id"] for f in cfg["solar_farms"]],
@@ -47,12 +51,22 @@ def run(world_yaml: str = "config/world.yaml",
     sim = Simulator(cfg)
     init_simulator(sim)
     init_executor_simulator(sim)
-    reset_monitor()
 
     if data_source == "db" and project_id is not None:
         init_data_collector_db(
             project_id, cfg["solar_farms"], cfg["wind_farms"]
         )
+
+    use_checkpointer = data_source == "db"
+    if use_checkpointer:
+        cp = get_checkpointer()
+        thread_id = str(project_id)
+        cp.delete_thread(thread_id)
+    else:
+        thread_id = "simulator"
+
+    graph = compile_graph(use_checkpointer=use_checkpointer)
+    config = {"configurable": {"thread_id": thread_id}}
 
     defaults = cfg.get("defaults", {})
     state: dict = {
@@ -64,17 +78,20 @@ def run(world_yaml: str = "config/world.yaml",
         "retry_count": 0,
     }
 
-    for tick in range(TICKS):
+    try:
+        for tick in range(TICKS):
+            if data_source == "db":
+                run_state.set_tick(tick)
+            state["tick"] = tick
+            state["retry_count"] = 0
+            state["violations"] = []
+            result = graph.invoke(state, config)
+            state.update(result)
+    finally:
         if data_source == "db":
-            run_state.set_tick(tick)
-        state["tick"] = tick
-        state["retry_count"] = 0
-        state["violations"] = []
-        result = graph.invoke(state)
-        state.update(result)
-
-    if data_source == "db":
-        run_state.set_stopped()
+            run_state.set_stopped()
+            if project_id is not None:
+                run_state.release_project(project_id)
 
     return state.get("tick_log", [])
 
