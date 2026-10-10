@@ -60,7 +60,7 @@ export default function ProjectTable({ refreshKey }) {
               <th>Wind Farms</th>
               <th>Total Wind (MW)</th>
               <th>Batteries</th>
-              <th>Battery Capacity (MW)</th>
+              <th>Battery Capacity (MWh)</th>
               <th>Grid Limit (MW)</th>
             </tr>
           </thead>
@@ -73,7 +73,7 @@ export default function ProjectTable({ refreshKey }) {
                 <td>{p.wind_farms.map((f) => f.id).join(", ") || "-"}</td>
                 <td className="cell-num">{p.total_wind_mw}</td>
                 <td>{p.batteries.map((b) => b.id).join(", ") || "-"}</td>
-                <td className="cell-num">{p.total_battery_capacity_mw}</td>
+                <td className="cell-num">{p.total_battery_capacity_mwh}</td>
                 <td className="cell-num">
                   {p.grids.length > 0
                     ? p.grids.map((g) => g.line_limit_mw).join(", ")

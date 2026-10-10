@@ -4,11 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from api.database import get_db
-from api.models import Battery, Project, SolarFarm, WindFarm
+from api.models import Battery, Consumer, Project, SolarFarm, WindFarm
 from api.schemas import (
     BatteryCreate,
     BatteryList,
     BatteryResponse,
+    ConsumerCreate,
+    ConsumerList,
+    ConsumerResponse,
     SolarFarmCreate,
     SolarFarmList,
     SolarFarmResponse,
@@ -120,16 +123,22 @@ def create_battery(body: BatteryCreate, db: Session = Depends(get_db)):
         raise HTTPException(400, f"Battery '{body.id}' already exists in project '{body.project_name}'")
     battery = Battery(
         battery_id=body.id,
-        total_capacity_mw=body.total_capacity_mw,
-        charge_discharge_rate_mwh=body.charge_discharge_rate_mwh,
+        total_capacity_mw=body.capacity_mwh,
+        charge_discharge_rate_mwh=body.max_rate_mw,
+        min_soc_pct=body.min_soc_pct,
+        max_soc_pct=body.max_soc_pct,
+        initial_soc_pct=body.initial_soc_pct,
         project_id=project.id,
     )
     db.add(battery)
     db.commit()
     return BatteryResponse(
         id=battery.battery_id,
-        total_capacity_mw=battery.total_capacity_mw,
-        charge_discharge_rate_mwh=battery.charge_discharge_rate_mwh,
+        capacity_mwh=battery.total_capacity_mw,
+        max_rate_mw=battery.charge_discharge_rate_mwh,
+        min_soc_pct=battery.min_soc_pct,
+        max_soc_pct=battery.max_soc_pct,
+        initial_soc_pct=battery.initial_soc_pct,
         project_name=project.name,
     )
 
@@ -146,10 +155,70 @@ def list_batteries(project_name: str, db: Session = Depends(get_db)):
     items = [
         BatteryResponse(
             id=b.battery_id,
-            total_capacity_mw=b.total_capacity_mw,
-            charge_discharge_rate_mwh=b.charge_discharge_rate_mwh,
+            capacity_mwh=b.total_capacity_mw,
+            max_rate_mw=b.charge_discharge_rate_mwh,
+            min_soc_pct=b.min_soc_pct,
+            max_soc_pct=b.max_soc_pct,
+            initial_soc_pct=b.initial_soc_pct,
             project_name=project.name,
         )
         for b in batteries
     ]
-    return BatteryList(batteries=items, total_capacity_mw=sum(b.total_capacity_mw for b in batteries))
+    return BatteryList(batteries=items, total_capacity_mwh=sum(b.total_capacity_mw for b in batteries))
+
+
+# ── consumers ────────────────────────────────────────────────────────────
+
+
+@router.post("/consumers", response_model=ConsumerResponse, status_code=201)
+def create_consumer(body: ConsumerCreate, db: Session = Depends(get_db)):
+    project = _get_project(db, body.project_name)
+    existing = (
+        db.query(Consumer)
+        .filter(Consumer.consumer_id == body.id, Consumer.project_id == project.id)
+        .first()
+    )
+    if existing:
+        raise HTTPException(400, f"Consumer '{body.id}' already exists in project '{body.project_name}'")
+    consumer = Consumer(
+        consumer_id=body.id,
+        day_load_mw=body.day_load_mw,
+        night_load_mw=body.night_load_mw,
+        shift_start=body.shift_start,
+        shift_end=body.shift_end,
+        project_id=project.id,
+    )
+    db.add(consumer)
+    db.commit()
+    return ConsumerResponse(
+        id=consumer.consumer_id,
+        day_load_mw=consumer.day_load_mw,
+        night_load_mw=consumer.night_load_mw,
+        shift_start=consumer.shift_start,
+        shift_end=consumer.shift_end,
+        project_name=project.name,
+    )
+
+
+@router.get("/consumers", response_model=ConsumerList)
+def list_consumers(project_name: str, db: Session = Depends(get_db)):
+    project = _get_project(db, project_name)
+    consumers = (
+        db.query(Consumer)
+        .filter(Consumer.project_id == project.id)
+        .order_by(Consumer.consumer_id)
+        .all()
+    )
+    return ConsumerList(
+        consumers=[
+            ConsumerResponse(
+                id=c.consumer_id,
+                day_load_mw=c.day_load_mw,
+                night_load_mw=c.night_load_mw,
+                shift_start=c.shift_start,
+                shift_end=c.shift_end,
+                project_name=project.name,
+            )
+            for c in consumers
+        ]
+    )

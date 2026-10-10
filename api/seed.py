@@ -4,7 +4,7 @@ from __future__ import annotations
 import yaml
 
 from api.database import Base, SessionLocal, engine
-from api.models import AssetStatus, Battery, Factory, Grid, Project, SolarFarm, WindFarm
+from api.models import AssetStatus, Battery, Consumer, Factory, Grid, Project, SolarFarm, WindFarm
 
 
 def seed(yaml_path: str, project_name: str) -> None:

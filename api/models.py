@@ -15,6 +15,7 @@ class Project(Base):
     solar_farms: Mapped[list[SolarFarm]] = relationship(back_populates="project", cascade="all, delete-orphan")
     wind_farms: Mapped[list[WindFarm]] = relationship(back_populates="project", cascade="all, delete-orphan")
     batteries: Mapped[list[Battery]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    consumers: Mapped[list[Consumer]] = relationship(back_populates="project", cascade="all, delete-orphan")
     factories: Mapped[list[Factory]] = relationship(back_populates="project", cascade="all, delete-orphan")
     grids: Mapped[list[Grid]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
@@ -57,9 +58,29 @@ class Battery(Base):
     battery_id: Mapped[str] = mapped_column(String, nullable=False)
     total_capacity_mw: Mapped[float] = mapped_column(Float, nullable=False)
     charge_discharge_rate_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    min_soc_pct: Mapped[float] = mapped_column(Float, nullable=False, default=10.0)
+    max_soc_pct: Mapped[float] = mapped_column(Float, nullable=False, default=95.0)
+    initial_soc_pct: Mapped[float] = mapped_column(Float, nullable=False, default=50.0)
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
 
     project: Mapped[Project] = relationship(back_populates="batteries")
+
+
+class Consumer(Base):
+    __tablename__ = "consumer"
+    __table_args__ = (
+        UniqueConstraint("consumer_id", "project_id", name="uq_consumer_project"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    consumer_id: Mapped[str] = mapped_column(String, nullable=False)
+    day_load_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    night_load_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    shift_start: Mapped[str] = mapped_column(String, nullable=False, default="06:00")
+    shift_end: Mapped[str] = mapped_column(String, nullable=False, default="22:00")
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+
+    project: Mapped[Project] = relationship(back_populates="consumers")
 
 
 class Factory(Base):

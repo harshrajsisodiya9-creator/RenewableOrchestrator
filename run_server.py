@@ -15,6 +15,36 @@ from api.main import app
 from graph.run_state import run_state
 
 
+def _load_consumers_into_config(cfg: dict, project_id: int) -> None:
+    """Load consumers from DB and add them to cfg['factories'] for the simulator."""
+    from api.database import SessionLocal
+    from api.models import Consumer
+
+    db = SessionLocal()
+    try:
+        consumers = (
+            db.query(Consumer)
+            .filter(Consumer.project_id == project_id)
+            .order_by(Consumer.consumer_id)
+            .all()
+        )
+        for c in consumers:
+            h_start, m_start = map(int, c.shift_start.split(":"))
+            h_end, m_end = map(int, c.shift_end.split(":"))
+            start_hour = h_start + m_start / 60.0
+            end_hour = h_end + m_end / 60.0
+            cfg.setdefault("factories", []).append({
+                "id": c.consumer_id,
+                "priority": "standard",
+                "base_mw": c.night_load_mw,
+                "day_mw": c.day_load_mw - c.night_load_mw,
+                "start_hour": start_hour,
+                "end_hour": end_hour,
+            })
+    finally:
+        db.close()
+
+
 def run_graph_loop(project_name: str) -> None:
     from graph.simulator import Simulator, load_config
     from graph.nodes.data_collector import init_simulator, init_data_collector_db
@@ -31,6 +61,7 @@ def run_graph_loop(project_name: str) -> None:
 
         cfg = load_config_from_db(project_name)
         project_id = cfg.pop("_project_id")
+        _load_consumers_into_config(cfg, project_id)
 
         if not run_state.acquire_project(project_id):
             raise RuntimeError(

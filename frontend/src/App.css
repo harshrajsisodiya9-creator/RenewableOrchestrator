@@ -122,9 +122,10 @@ fieldset legend {
 
 .inline-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .inline-row input {
@@ -132,8 +133,20 @@ fieldset legend {
   min-width: 0;
 }
 
-.inline-row.three-col input:first-child {
-  flex: 0.7;
+.inline-row .input-id {
+  flex: 0 0 52px;
+  max-width: 60px;
+}
+
+.inline-row .input-time {
+  flex: 0 0 58px;
+  max-width: 64px;
+  text-align: center;
+}
+
+.inline-row.consumer-row input {
+  flex: 1;
+  min-width: 0;
 }
 
 .btn-icon {
@@ -280,6 +293,59 @@ tbody tr:hover {
 .cell-num {
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+/* ── field errors ─────────────────────────────────────────── */
+.field-error {
+  color: var(--red);
+  font-size: 0.75rem;
+  margin: 2px 0 6px 0;
+}
+
+/* ── battery advanced toggle ─────────────────────────────── */
+.battery-block {
+  margin-bottom: 10px;
+}
+
+.btn-toggle-advanced {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 0;
+  margin-bottom: 4px;
+}
+
+.btn-toggle-advanced:hover {
+  color: var(--accent);
+}
+
+.advanced-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+}
+
+.advanced-fields label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.advanced-fields input {
+  width: 100%;
+}
+
+/* ── panel overflow fix ──────────────────────────────────── */
+.panel-form {
+  overflow-x: hidden;
 }
 
 /* ── responsive ───────────────────────────────────────────── */

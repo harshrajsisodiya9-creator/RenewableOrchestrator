@@ -33,6 +33,24 @@ def run(world_yaml: str = "config/world.yaml",
         cfg = load_config_from_db(project_name or "farm 1")
         project_id = cfg.pop("_project_id")
 
+        from api.database import SessionLocal
+        from api.models import Consumer as ConsumerModel
+        _db = SessionLocal()
+        try:
+            for c in _db.query(ConsumerModel).filter(ConsumerModel.project_id == project_id).all():
+                h_s, m_s = map(int, c.shift_start.split(":"))
+                h_e, m_e = map(int, c.shift_end.split(":"))
+                cfg.setdefault("factories", []).append({
+                    "id": c.consumer_id,
+                    "priority": "standard",
+                    "base_mw": c.night_load_mw,
+                    "day_mw": c.day_load_mw - c.night_load_mw,
+                    "start_hour": h_s + m_s / 60.0,
+                    "end_hour": h_e + m_e / 60.0,
+                })
+        finally:
+            _db.close()
+
         if not run_state.acquire_project(project_id):
             raise RuntimeError(
                 f"Project {project_id} already has an active run"

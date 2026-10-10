@@ -25,6 +25,19 @@ export async function createProject(name) {
   return res.json();
 }
 
+export async function createProjectFull(data) {
+  const res = await fetch(`${API}/projects/full`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw err;
+  }
+  return res.json();
+}
+
 export async function createSolarFarm(data) {
   const res = await fetch(`${API}/solar-farms`, {
     method: "POST",
@@ -60,6 +73,19 @@ export async function createBattery(data) {
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.detail || "Failed to create battery");
+  }
+  return res.json();
+}
+
+export async function createConsumer(data) {
+  const res = await fetch(`${API}/consumers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to create consumer");
   }
   return res.json();
 }
