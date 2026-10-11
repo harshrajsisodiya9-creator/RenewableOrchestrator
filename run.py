@@ -13,7 +13,7 @@ from graph.simulator import Simulator, load_config
 from graph.nodes.data_collector import init_simulator, init_data_collector_db
 from graph.nodes.executor import init_executor_simulator
 from graph.graph import compile_graph, get_checkpointer
-from graph.models.state import Action
+from graph.models.state import Action, DayPlan
 
 TICKS = 96
 
@@ -94,6 +94,8 @@ def run(world_yaml: str = "config/world.yaml",
         "curtail_penalty_per_kwh": defaults.get("curtail_penalty_per_kwh", 0.30),
         "tick_log": [],
         "retry_count": 0,
+        "day_plan": DayPlan(),
+        "prev_buy_mw": 0.0,
     }
 
     try:
@@ -103,6 +105,9 @@ def run(world_yaml: str = "config/world.yaml",
             state["tick"] = tick
             state["retry_count"] = 0
             state["violations"] = []
+            state["planner_called"] = False
+            state["llm_fallback_used"] = False
+            state["request_replan"] = False
             result = graph.invoke(state, config)
             state.update(result)
     finally:

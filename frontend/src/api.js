@@ -1,4 +1,4 @@
-const API = "http://localhost:8000";
+const API = "/api";
 
 export async function fetchProjects() {
   const res = await fetch(`${API}/projects/`);
@@ -201,8 +201,12 @@ export async function injectFault(data) {
     body: JSON.stringify(data),
   });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.detail || "Failed to inject fault");
+    let detail = "Failed to inject fault";
+    try {
+      const err = await res.json();
+      detail = err.detail || detail;
+    } catch {}
+    throw new Error(detail);
   }
   return res.json();
 }

@@ -606,6 +606,55 @@ tbody tr:hover {
   overflow-y: auto;
 }
 
+/* ── capacity bar ────────────────────────────────────────── */
+.capacity-bar {
+  display: flex;
+  gap: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  box-shadow: var(--shadow);
+  flex-wrap: wrap;
+}
+
+.cap-heading {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  width: 100%;
+}
+
+.cap-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.cap-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cap-solar { background: #f59e0b; }
+.cap-wind { background: #06b6d4; }
+.cap-battery { background: #8b5cf6; }
+.cap-grid { background: #64748b; }
+
+.cap-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.cap-value {
+  font-weight: 700;
+  color: var(--text);
+}
+
 /* ── chart cards ──────────────────────────────────────────── */
 .chart-card {
   background: var(--surface);

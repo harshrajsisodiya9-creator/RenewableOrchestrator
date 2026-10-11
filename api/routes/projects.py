@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from api.database import get_db
-from api.models import Battery, Consumer, Grid, Project, SolarFarm, WindFarm
+from api.models import (
+    AssetStatus, Battery, Consumer, Event, Grid, Project,
+    RunSession, SolarFarm, TickResult, WindFarm,
+)
 from api.schemas import (
     BatteryResponse,
     ConsumerResponse,
@@ -108,6 +111,10 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).get(project_id)
     if not project:
         raise HTTPException(404, f"Project {project_id} not found")
+    db.query(TickResult).filter(TickResult.project_id == project_id).delete()
+    db.query(RunSession).filter(RunSession.project_id == project_id).delete()
+    db.query(AssetStatus).filter(AssetStatus.project_id == project_id).delete()
+    db.query(Event).filter(Event.project_id == project_id).delete()
     db.delete(project)
     db.commit()
 

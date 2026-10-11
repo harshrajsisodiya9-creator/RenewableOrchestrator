@@ -275,6 +275,7 @@ class _ProjectRunner:
             "carbon_tonnes": round(buy_mw * 0.25 * 0.71, 4),
         }
         supervisor = {
+            "called": state.get("should_call_supervisor", False),
             "risk_level": state.get("risk_level", ""),
             "reserve_target_pct": state.get("reserve_target_pct", 0),
             "strategy_reason": state.get("strategy_reason", ""),

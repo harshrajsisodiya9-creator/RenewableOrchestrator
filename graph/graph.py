@@ -16,6 +16,7 @@ from graph.nodes.executor import executor
 from graph.nodes.logger import logger
 from graph.nodes.monitor import monitor
 from graph.nodes.optimizer import optimizer
+from graph.nodes.planner import planner
 from graph.nodes.supervisor import supervisor
 from graph.nodes.validator import validator
 
@@ -55,6 +56,7 @@ workflow = StateGraph(State)
 # ── register nodes ────────────────────────────────────────────────────────
 workflow.add_node("data_collector", data_collector)
 workflow.add_node("monitor", monitor)
+workflow.add_node("planner", planner)
 workflow.add_node("supervisor", supervisor)
 workflow.add_node("optimizer", optimizer)
 workflow.add_node("validator", validator)
@@ -69,10 +71,15 @@ workflow.add_edge("data_collector", "monitor")
 
 workflow.add_conditional_edges(
     "monitor",
-    lambda s: "supervisor" if s.get("should_call_supervisor") else "optimizer",
-    {"supervisor": "supervisor", "optimizer": "optimizer"},
+    lambda s: (
+        "planner" if s.get("should_call_planner")
+        else "supervisor" if s.get("should_call_supervisor")
+        else "optimizer"
+    ),
+    {"planner": "planner", "supervisor": "supervisor", "optimizer": "optimizer"},
 )
 
+workflow.add_edge("planner", "supervisor")
 workflow.add_edge("supervisor", "optimizer")
 workflow.add_edge("optimizer", "validator")
 

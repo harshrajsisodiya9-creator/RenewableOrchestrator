@@ -48,6 +48,29 @@ class MaintenanceWindow:
 
 
 @dataclass
+class FloorWindow:
+    """Time window with a minimum battery SoC floor."""
+
+    start: str  # "HH:MM"
+    end: str  # "HH:MM"
+    floor_pct: float
+
+
+@dataclass
+class DayPlan:
+    """Strategic plan produced by the day planner LLM."""
+
+    summary: str = "Default plan (planner unavailable)"
+    risk_level: str = "medium"  # "low" | "medium" | "high"
+    floor_schedule: list[FloorWindow] = field(
+        default_factory=lambda: [FloorWindow("00:00", "24:00", 35.0)]
+    )
+    sell_policy: str = "only_above_terminal"  # "free" | "only_above_terminal" | "no_sell"
+    storm_actions: list[str] = field(default_factory=list)
+    reasoning: str = "Fallback plan — planner not available"
+
+
+@dataclass
 class Action:
     """Dispatch decision produced by the optimizer for one tick."""
 
@@ -86,6 +109,13 @@ class MonitorMemory(TypedDict, total=False):
     anchored_wind_mw: float | None
     anchored_demand_mw: float | None
     anchored_battery_soc_pct: float | None
+    prev_demand_mw: float | None
+    prev_solar_above_1: bool
+
+
+class PlannerMemory(TypedDict, total=False):
+    last_planner_tick: int
+    consecutive_deviation_ticks: int
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +158,8 @@ class State(TypedDict, total=False):
     price_forecast: Forecast  # 6 h ahead (filled by data node)
 
     # ── Grid ──────────────────────────────────────────────────────────────
-    line_limit_mw: float  # transmission capacity (MW)
+    line_limit_mw: float  # transmission capacity (MW), may be storm-derated
+    line_limit_nominal_mw: float  # nominal line limit before derating
 
     # ── Alerts & maintenance ──────────────────────────────────────────────
     storm_alerts: list[StormAlert]  # active storm warnings
@@ -143,17 +174,31 @@ class State(TypedDict, total=False):
 
     # ── Monitor output ────────────────────────────────────────────────────
     should_call_supervisor: bool  # True → route to LLM supervisor
+    should_call_planner: bool  # True → route to day planner
     monitor_triggers: list[str]  # reasons the monitor flagged this tick
     monitor_memory: MonitorMemory  # persisted across ticks, per-run
+    planner_memory: PlannerMemory  # persisted across ticks, per-run
+
+    # ── Day planner output ────────────────────────────────────────────────
+    day_plan: DayPlan  # strategic plan for the day
+    request_replan: bool  # supervisor requests a new day plan
+
+    # ── Features (shared between planner and optimizer) ───────────────────
+    features: dict  # output of build_features()
 
     # ── Supervisor (LLM) output ───────────────────────────────────────────
     risk_level: str  # "low" | "medium" | "high" | "critical"
     reserve_target_pct: float  # dynamic reserve target from LLM (%)
     strategy_reason: str  # LLM explanation for its decision
 
+    # ── Planner / LLM tracking ──────────────────────────────────────────
+    planner_called: bool  # True if planner ran this tick
+    llm_fallback_used: bool  # True if LLM failed and fallback was used
+
     # ── Optimizer output ──────────────────────────────────────────────────
     plan: Action  # dispatch plan for this tick
     plan_status: str  # "optimal" | "fallback" | "error"
+    lp_info: dict  # terminal values, solve time, etc.
 
     # ── Validator output ──────────────────────────────────────────────────
     validated_action: Action  # plan after constraint enforcement
@@ -163,6 +208,9 @@ class State(TypedDict, total=False):
 
     # ── Asset status (DB mode) ───────────────────────────────────────────
     asset_statuses: list[dict]  # [{asset_type, asset_id, status, ...}]
+
+    # ── Executor carry-forward ──────────────────────────────────────────
+    prev_buy_mw: float  # previous tick's buy for ramp penalty
 
     # ── Logger output ─────────────────────────────────────────────────────
     tick_log: list[dict]  # accumulated per-tick records

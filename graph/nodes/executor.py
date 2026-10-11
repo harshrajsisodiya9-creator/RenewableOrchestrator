@@ -47,4 +47,5 @@ def executor(state: State) -> dict:
     return {
         "battery_energy_mwh": round(e_after, 2),
         "battery_soc_pct": round(soc_after, 2),
+        "prev_buy_mw": action.buy,
     }

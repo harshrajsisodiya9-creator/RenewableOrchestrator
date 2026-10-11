@@ -22,8 +22,23 @@ def logger(state: State) -> dict:
     sell_income = action.sell * DT * price * 1000.0
     carbon = action.buy * DT * EMISSION_TCO2_PER_MWH
 
+    day_plan = state.get("day_plan")
+    lp_info = state.get("lp_info", {})
+
+    # active floor from day plan
+    tick_val = state.get("tick", 0)
+    active_floor_pct = 35.0
+    if day_plan is not None:
+        h = tick_val // 4
+        m = (tick_val % 4) * 15
+        t_str = f"{h:02d}:{m:02d}"
+        for w in day_plan.floor_schedule:
+            if w.start <= t_str < w.end:
+                active_floor_pct = w.floor_pct
+                break
+
     entry = {
-        "tick": state.get("tick", 0),
+        "tick": tick_val,
         "timestamp": state.get("timestamp", ""),
         "solar_mw": state.get("solar_mw", 0.0),
         "wind_mw": state.get("wind_mw", 0.0),
@@ -46,6 +61,15 @@ def logger(state: State) -> dict:
         "cash_cost_inr": round(buy_cost - sell_income, 2),
         "carbon_tonnes": round(carbon, 4),
         "supervisor_called": state.get("should_call_supervisor", False),
+        # ── new fields (Change 5) ────────────────────────────────────────
+        "planner_called": state.get("planner_called", False),
+        "day_plan_summary": day_plan.summary if day_plan else "",
+        "active_floor_pct": active_floor_pct,
+        "sell_policy": day_plan.sell_policy if day_plan else "",
+        "terminal_v_high": lp_info.get("terminal_v_high", 0.0),
+        "terminal_v_low": lp_info.get("terminal_v_low", 0.0),
+        "e_need_mwh": lp_info.get("e_need_mwh", 0.0),
+        "llm_fallback_used": state.get("llm_fallback_used", False),
     }
 
     _write_to_file(state, entry)

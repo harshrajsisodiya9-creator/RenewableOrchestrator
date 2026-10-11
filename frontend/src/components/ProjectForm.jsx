@@ -218,12 +218,17 @@ export default function ProjectForm({ onCreated }) {
           setError(err.detail);
         } else if (Array.isArray(err.detail)) {
           const parsed = {};
+          const topErrors = [];
           err.detail.forEach((d) => {
             const loc = d.loc?.join(".") || "general";
-            parsed[loc] = d.msg;
+            if (loc === "body" || loc === "general") {
+              topErrors.push(d.msg.replace(/^Value error, /, ""));
+            } else {
+              parsed[loc] = d.msg;
+            }
           });
           setFieldErrors(parsed);
-          setError("Please fix the errors below");
+          setError(topErrors.length > 0 ? topErrors.join("; ") : "Please fix the errors below");
         } else {
           setError(JSON.stringify(err.detail));
         }

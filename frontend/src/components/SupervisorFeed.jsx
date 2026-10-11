@@ -8,15 +8,23 @@ const RISK_CLASS = {
 };
 
 export default function SupervisorFeed({ ticks }) {
-  const bottomRef = useRef(null);
+  const feedRef = useRef(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = feedRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [ticks.length]);
 
-  const entries = ticks.filter(
-    (t) => t.supervisor && t.supervisor.risk_level
-  );
+  const entries = ticks.filter((t, i) => {
+    if (!t.supervisor || !t.supervisor.risk_level) return false;
+    if (t.supervisor.called !== undefined) return t.supervisor.called;
+    const prev = ticks[i - 1]?.supervisor;
+    return (
+      !prev ||
+      prev.strategy_reason !== t.supervisor.strategy_reason ||
+      prev.risk_level !== t.supervisor.risk_level
+    );
+  });
 
   if (entries.length === 0) {
     return (
@@ -30,7 +38,7 @@ export default function SupervisorFeed({ ticks }) {
   return (
     <div className="panel-section">
       <h3>Decisions Made</h3>
-      <div className="supervisor-feed">
+      <div className="supervisor-feed" ref={feedRef}>
         {entries.map((t) => (
           <div
             key={t.tick}
@@ -57,7 +65,6 @@ export default function SupervisorFeed({ ticks }) {
             )}
           </div>
         ))}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

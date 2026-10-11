@@ -125,7 +125,7 @@ class AssetStatus(Base):
     )
 
     pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
     asset_type: Mapped[str] = mapped_column(String, nullable=False)
     asset_id: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="online")

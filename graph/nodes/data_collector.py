@@ -400,4 +400,25 @@ def data_collector(state: State) -> dict:
             obs.get("line_limit_mw", 0),
         )
 
+    # ── build shared features for planner + optimizer ────────────────────
+    from graph.nodes.features import build_features
+
+    _solar_fc = obs.get("solar_forecast")
+    _wind_fc = obs.get("wind_forecast")
+    _demand_fc = obs.get("demand_forecast")
+    _price_fc = obs.get("price_forecast")
+
+    forecast_96 = {
+        "solar": _solar_fc.values if _solar_fc else [],
+        "wind": _wind_fc.values if _wind_fc else [],
+        "demand": _demand_fc.values if _demand_fc else [],
+        "price": _price_fc.values if _price_fc else [],
+    }
+    telemetry = {
+        "soc_pct": obs.get("battery_soc_pct", 0.0),
+        "soc_mwh": obs.get("battery_energy_mwh", 0.0),
+    }
+    alert_texts = [a.notice for a in obs.get("storm_alerts", [])]
+    obs["features"] = build_features(forecast_96, telemetry, alert_texts)
+
     return obs

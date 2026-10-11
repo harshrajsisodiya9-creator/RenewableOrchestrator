@@ -24,7 +24,7 @@ from graph.models.state import (
 
 TICKS_PER_HOUR = 4
 TOTAL_TICKS = 96
-FORECAST_HORIZON = 24  # 6 hours at 15-min resolution
+FORECAST_HORIZON = 96  # 24 hours at 15-min resolution
 
 
 # ── helpers ───────────────────────────────────────────────────────────────
@@ -381,6 +381,7 @@ class Simulator:
 
             # grid
             "line_limit_mw": self._get_line_limit(tick),
+            "line_limit_nominal_mw": float(self._grid["line_limit_mw"]),
 
             # alerts & maintenance
             "storm_alerts": self._get_storm_alerts(tick),

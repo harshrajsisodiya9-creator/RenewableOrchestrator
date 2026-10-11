@@ -275,12 +275,19 @@ class ProjectFullCreate(BaseModel):
             + sum(b.max_rate_mw for b in self.batteries)
             + self.grid.line_limit_mw
         )
-        total_day_demand = sum(c.day_load_mw for c in self.consumers)
-        if total_day_demand > total_supply:
+        peak_demand = 0.0
+        for quarter in range(96):
+            h = quarter * 0.25
+            load = 0.0
+            for c in self.consumers:
+                sh, sm = map(int, c.shift_start.split(":"))
+                eh, em = map(int, c.shift_end.split(":"))
+                load += c.day_load_mw if (sh + sm / 60) <= h < (eh + em / 60) else c.night_load_mw
+            peak_demand = max(peak_demand, load)
+        if peak_demand > total_supply:
             raise ValueError(
-                "Demand cannot be met even at full supply: "
-                f"consumer day loads ({total_day_demand:.1f} MW) exceed "
-                f"total farm MW + battery rate + line limit ({total_supply:.1f} MW)"
+                "Peak concurrent demand ({:.1f} MW) exceeds "
+                "total supply capacity ({:.1f} MW)".format(peak_demand, total_supply)
             )
 
         return self

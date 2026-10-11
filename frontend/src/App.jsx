@@ -12,6 +12,7 @@ import EventTimeline from "./components/EventTimeline";
 import SupervisorFeed from "./components/SupervisorFeed";
 import EventPanel from "./components/EventPanel";
 import InjectPanel from "./components/InjectPanel";
+import CapacityBar from "./components/CapacityBar";
 import Scorecard from "./components/Scorecard";
 import {
   fetchProjects,
@@ -176,6 +177,7 @@ function SimulatePage() {
       {!isIdle && (
         <div className="sim-content">
           <div className="sim-charts">
+            <CapacityBar project={project} />
             <GenerationChart ticks={ticks} />
             <DispatchChart ticks={ticks} />
             <BatteryChart ticks={ticks} />
