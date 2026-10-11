@@ -45,6 +45,57 @@ def _load_consumers_into_config(cfg: dict, project_id: int) -> None:
         db.close()
 
 
+TEST_PROJECT = {
+    "name": "Test Project",
+    "solar_farms": [
+        {"id": "S1", "power_output_mw": 120},
+        {"id": "S2", "power_output_mw": 100},
+        {"id": "S3", "power_output_mw": 80},
+        {"id": "S4", "power_output_mw": 60},
+        {"id": "S5", "power_output_mw": 40},
+    ],
+    "wind_farms": [
+        {"id": "W1", "power_output_mw": 80},
+        {"id": "W2", "power_output_mw": 60},
+        {"id": "W3", "power_output_mw": 40},
+    ],
+    "batteries": [
+        {"id": "B1", "capacity_mwh": 250, "max_rate_mw": 120,
+         "min_soc_pct": 10, "max_soc_pct": 90, "initial_soc_pct": 50},
+        {"id": "B2", "capacity_mwh": 150, "max_rate_mw": 60,
+         "min_soc_pct": 10, "max_soc_pct": 90, "initial_soc_pct": 50},
+    ],
+    "consumers": [
+        {"id": "C1", "day_load_mw": 120, "night_load_mw": 80,
+         "shift_start": "06:00", "shift_end": "22:00"},
+        {"id": "C2", "day_load_mw": 70, "night_load_mw": 40,
+         "shift_start": "08:00", "shift_end": "20:00"},
+        {"id": "C3", "day_load_mw": 30, "night_load_mw": 30,
+         "shift_start": "00:00", "shift_end": "23:59"},
+    ],
+    "grid": {"line_limit_mw": 200, "buy_premium_per_kwh": 0.5, "price_cap_per_kwh": 12},
+}
+
+
+def ensure_test_project() -> None:
+    """Create the demo 'Test Project' if it is not already in the database."""
+    from api.database import Base, SessionLocal, engine
+    from api.models import Project
+    from api.routes.projects import create_project_full
+    from api.schemas import ProjectFullCreate
+
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        if db.query(Project).filter(Project.name == TEST_PROJECT["name"]).first():
+            print(f"[seed] '{TEST_PROJECT['name']}' already present")
+            return
+        create_project_full(ProjectFullCreate(**TEST_PROJECT), db)
+        print(f"[seed] created '{TEST_PROJECT['name']}'")
+    finally:
+        db.close()
+
+
 def run_graph_loop(project_name: str) -> None:
     from graph.simulator import Simulator, load_config
     from graph.nodes.data_collector import init_simulator, init_data_collector_db
@@ -146,4 +197,5 @@ def start_simulation(project_name: str = "farm 1"):
 
 
 if __name__ == "__main__":
+    ensure_test_project()
     uvicorn.run(app, host="0.0.0.0", port=8000)
