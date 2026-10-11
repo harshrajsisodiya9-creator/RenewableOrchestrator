@@ -105,9 +105,9 @@ class Simulator:
         self._price_fc = self._build_forecast(self._price_truth, 0.10)
 
         # battery state (mutable — updated each observe call)
-        cap = self._battery["capacity_mwh"]
-        init_pct = self._battery["soc_init_pct"]
-        self._battery_energy = cap * init_pct / 100.0
+        cap = self._battery.get("capacity_mwh", 0.0)
+        init_pct = self._battery.get("soc_init_pct", 0.0)
+        self._battery_energy = cap * init_pct / 100.0 if cap > 0 else 0.0
 
     # ── solar generation ──────────────────────────────────────────────────
 
@@ -199,6 +199,8 @@ class Simulator:
     def _apply_cloud_events(self) -> None:
         farm_caps = {f["id"]: f["capacity_mw"] for f in self._solar_farms}
         total_cap = self._solar["total_capacity_mw"]
+        if total_cap <= 0:
+            return
         for ev in self._cloud_events:
             t0 = _hhmm_to_tick(ev["start"])
             t1 = _hhmm_to_tick(ev["end"])
@@ -336,8 +338,8 @@ class Simulator:
         price = float(self._price_truth[tick])
 
         bat = self._battery
-        cap = bat["capacity_mwh"]
-        soc_pct = self._battery_energy / cap * 100.0
+        cap = bat.get("capacity_mwh", 0.0)
+        soc_pct = (self._battery_energy / cap * 100.0) if cap > 0 else 0.0
 
         return {
             # time
@@ -367,10 +369,10 @@ class Simulator:
             "battery_soc_pct": round(soc_pct, 2),
             "battery_energy_mwh": round(self._battery_energy, 2),
             "battery_capacity_mwh": float(cap),
-            "battery_max_charge_mw": float(bat["max_charge_mw"]),
-            "battery_max_discharge_mw": float(bat["max_discharge_mw"]),
-            "battery_min_energy_mwh": cap * bat["soc_min_pct"] / 100.0,
-            "battery_max_energy_mwh": cap * bat["soc_max_pct"] / 100.0,
+            "battery_max_charge_mw": float(bat.get("max_charge_mw", 0.0)),
+            "battery_max_discharge_mw": float(bat.get("max_discharge_mw", 0.0)),
+            "battery_min_energy_mwh": cap * bat.get("soc_min_pct", 0.0) / 100.0 if cap > 0 else 0.0,
+            "battery_max_energy_mwh": cap * bat.get("soc_max_pct", 100.0) / 100.0 if cap > 0 else 0.0,
 
             # market
             "price_per_kwh": round(price, 4),
@@ -388,9 +390,11 @@ class Simulator:
 
     def update_battery(self, delta_mwh: float) -> None:
         """Apply a charge (+) or discharge (−) delta to battery energy."""
-        cap = self._battery["capacity_mwh"]
-        floor = cap * self._battery["soc_min_pct"] / 100.0
-        ceil = cap * self._battery["soc_max_pct"] / 100.0
+        cap = self._battery.get("capacity_mwh", 0.0)
+        if cap <= 0:
+            return
+        floor = cap * self._battery.get("soc_min_pct", 0.0) / 100.0
+        ceil = cap * self._battery.get("soc_max_pct", 100.0) / 100.0
         self._battery_energy = max(floor, min(ceil,
                                               self._battery_energy + delta_mwh))
 

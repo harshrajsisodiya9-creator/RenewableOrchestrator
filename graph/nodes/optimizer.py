@@ -59,15 +59,15 @@ def _solve_lp(state: State) -> Action | None:
     renewables = [solar_fc[t] + wind_fc[t] for t in range(N)]
 
     # battery parameters
-    max_chg = state.get("battery_max_charge_mw", 150.0)
-    max_dis = state.get("battery_max_discharge_mw", 150.0)
-    e_min = state.get("battery_min_energy_mwh", 40.0)
-    e_max = state.get("battery_max_energy_mwh", 360.0)
-    e0 = state.get("battery_energy_mwh", 200.0)
-    capacity = state.get("battery_capacity_mwh", 400.0)
+    max_chg = state.get("battery_max_charge_mw", 0.0)
+    max_dis = state.get("battery_max_discharge_mw", 0.0)
+    e_min = state.get("battery_min_energy_mwh", 0.0)
+    e_max = state.get("battery_max_energy_mwh", 0.0)
+    e0 = state.get("battery_energy_mwh", 0.0)
+    capacity = state.get("battery_capacity_mwh", 0.0)
 
-    line_lim = state.get("line_limit_mw", 150.0)
-    reserve_target = state.get("reserve_target_pct", 20.0) / 100.0 * capacity
+    line_lim = state.get("line_limit_mw", 0.0)
+    reserve_target = state.get("reserve_target_pct", 20.0) / 100.0 * capacity if capacity > 0 else 0.0
 
     log.info(
         "tick=%d  LP inputs  solar[0]=%.1f MW  wind[0]=%.1f MW  demand[0]=%.1f MW  "
@@ -223,12 +223,12 @@ def _fallback_dispatch(state: State) -> Action:
     solar = state.get("solar_mw", 0.0)
     wind = state.get("wind_mw", 0.0)
     demand = state.get("demand_mw", 0.0)
-    max_chg = state.get("battery_max_charge_mw", 150.0)
-    max_dis = state.get("battery_max_discharge_mw", 150.0)
-    line_lim = state.get("line_limit_mw", 150.0)
-    e_now = state.get("battery_energy_mwh", 200.0)
-    e_min = state.get("battery_min_energy_mwh", 40.0)
-    e_max = state.get("battery_max_energy_mwh", 360.0)
+    max_chg = state.get("battery_max_charge_mw", 0.0)
+    max_dis = state.get("battery_max_discharge_mw", 0.0)
+    line_lim = state.get("line_limit_mw", 0.0)
+    e_now = state.get("battery_energy_mwh", 0.0)
+    e_min = state.get("battery_min_energy_mwh", 0.0)
+    e_max = state.get("battery_max_energy_mwh", 0.0)
 
     renewables = solar + wind
     gap = demand - renewables

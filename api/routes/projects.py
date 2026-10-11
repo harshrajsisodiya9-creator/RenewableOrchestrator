@@ -103,6 +103,15 @@ def get_project(project_name: str, db: Session = Depends(get_db)):
     return _build_project_detail(project)
 
 
+@router.delete("/{project_id}", status_code=204)
+def delete_project(project_id: int, db: Session = Depends(get_db)):
+    project = db.query(Project).get(project_id)
+    if not project:
+        raise HTTPException(404, f"Project {project_id} not found")
+    db.delete(project)
+    db.commit()
+
+
 def _build_project_detail(project: Project) -> ProjectDetail:
     solar_farms = [
         SolarFarmResponse(id=f.farm_id, power_output_mw=f.power_output_mw, project_name=project.name)
@@ -159,6 +168,24 @@ def _build_project_detail(project: Project) -> ProjectDetail:
         for g in project.grids
     ]
 
+    reasons: list[str] = []
+    has_consumers = len(project.consumers) > 0
+    has_grid = len(project.grids) > 0
+    line_limit = project.grids[0].line_limit_mw if project.grids else None
+    has_supply = (
+        len(project.solar_farms) > 0
+        or len(project.wind_farms) > 0
+        or len(project.batteries) > 0
+        or (line_limit is not None and line_limit > 0)
+    )
+
+    if not has_consumers:
+        reasons.append("No consumers defined")
+    if not has_grid:
+        reasons.append("No grid / line limit defined")
+    if not has_supply:
+        reasons.append("No supply path (needs a farm, battery, or line limit > 0)")
+
     return ProjectDetail(
         id=project.id,
         name=project.name,
@@ -171,4 +198,6 @@ def _build_project_detail(project: Project) -> ProjectDetail:
         total_solar_mw=sum(f.power_output_mw for f in project.solar_farms),
         total_wind_mw=sum(f.power_output_mw for f in project.wind_farms),
         total_battery_capacity_mwh=sum(b.total_capacity_mw for b in project.batteries),
+        is_complete=len(reasons) == 0,
+        incomplete_reasons=reasons,
     )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
@@ -218,9 +219,9 @@ class GridInput(BaseModel):
 
     @field_validator("line_limit_mw")
     @classmethod
-    def positive_limit(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Line limit must be > 0")
+    def non_negative_limit(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("Line limit must be >= 0 (0 = islanded)")
         return v
 
 
@@ -230,7 +231,7 @@ class ProjectFullCreate(BaseModel):
     wind_farms: list[WindFarmInput] = []
     batteries: list[BatteryInput] = []
     consumers: list[ConsumerInput] = []
-    grid: GridInput | None = None
+    grid: GridInput
 
     @field_validator("name")
     @classmethod
@@ -241,10 +242,17 @@ class ProjectFullCreate(BaseModel):
 
     @model_validator(mode="after")
     def cross_field_rules(self):
-        if not self.solar_farms and not self.wind_farms:
-            raise ValueError("At least one solar or wind farm is required")
         if not self.consumers:
             raise ValueError("At least one consumer is required")
+
+        has_farms = bool(self.solar_farms or self.wind_farms)
+        has_batteries = bool(self.batteries)
+        has_grid_import = self.grid.line_limit_mw > 0
+        if not (has_farms or has_batteries or has_grid_import):
+            raise ValueError(
+                "At least one supply path is required: "
+                "a solar farm, wind farm, battery, or line limit > 0"
+            )
 
         all_ids = (
             [s.id for s in self.solar_farms]
@@ -265,7 +273,7 @@ class ProjectFullCreate(BaseModel):
             sum(s.power_output_mw for s in self.solar_farms)
             + sum(w.power_output_mw for w in self.wind_farms)
             + sum(b.max_rate_mw for b in self.batteries)
-            + (self.grid.line_limit_mw if self.grid else 0)
+            + self.grid.line_limit_mw
         )
         total_day_demand = sum(c.day_load_mw for c in self.consumers)
         if total_day_demand > total_supply:
@@ -394,3 +402,119 @@ class ProjectDetail(BaseModel):
     total_solar_mw: float
     total_wind_mw: float
     total_battery_capacity_mwh: float
+    is_complete: bool
+    incomplete_reasons: list[str] = []
+
+
+# ── events ──────────────────────────────────────────────────────────────
+
+EVENT_TYPES = ("storm", "wind_lull", "cloud", "demand_spike", "price_spike", "maintenance")
+
+
+class EventCreate(BaseModel):
+    type: Literal["storm", "wind_lull", "cloud", "demand_spike", "price_spike", "maintenance"]
+    targets: list[str]
+    start_time: str
+    end_time: str
+    wind_speed_ms: float | None = None
+    line_derate_mw: float | None = None
+    pct_drop: float | None = None
+    extra_mw: float | None = None
+    multiplier: float | None = None
+    visibility: Literal["alerted", "surprise"] = "alerted"
+    alert_time: str | None = None
+    source: Literal["manual", "inject", "preset"] = "manual"
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_hhmm(cls, v: str) -> str:
+        if not re.fullmatch(r"\d{2}:\d{2}", v):
+            raise ValueError("Must be HH:MM format")
+        h, m = map(int, v.split(":"))
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            raise ValueError("Invalid time")
+        return v
+
+    @field_validator("alert_time")
+    @classmethod
+    def validate_alert_time(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not re.fullmatch(r"\d{2}:\d{2}", v):
+            raise ValueError("Must be HH:MM format")
+        return v
+
+    @model_validator(mode="after")
+    def check_alert_required(self):
+        if self.visibility == "alerted" and self.alert_time is None:
+            raise ValueError("alert_time is required when visibility is 'alerted'")
+        if self.alert_time is not None and self.start_time:
+            if self.alert_time > self.start_time:
+                raise ValueError("alert_time must be <= start_time")
+        return self
+
+
+class EventUpdate(BaseModel):
+    end_time: str | None = None
+    start_time: str | None = None
+    targets: list[str] | None = None
+    wind_speed_ms: float | None = None
+    line_derate_mw: float | None = None
+    pct_drop: float | None = None
+    extra_mw: float | None = None
+    multiplier: float | None = None
+    visibility: Literal["alerted", "surprise"] | None = None
+    alert_time: str | None = None
+
+
+class EventResponse(BaseModel):
+    id: int
+    project_id: int
+    type: str
+    targets: list[str]
+    start_time: str
+    end_time: str
+    wind_speed_ms: float | None
+    line_derate_mw: float | None
+    pct_drop: float | None
+    extra_mw: float | None
+    multiplier: float | None
+    visibility: str
+    alert_time: str | None
+    source: str
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+# ── simulation / run session ────────────────────────────────────────────
+
+
+class StartDayRequest(BaseModel):
+    mode: Literal["reliability", "profit", "clean"] = "reliability"
+    seed: int = 42
+    scenario: Literal["blank", "may_storm"] = "blank"
+
+
+class RunSessionResponse(BaseModel):
+    project_id: int
+    status: str
+    current_tick: int
+    mode: str
+    seed: int
+    scenario: str
+    speed: float
+
+    model_config = {"from_attributes": True}
+
+
+class TickResultResponse(BaseModel):
+    tick: int
+    timestamp: str
+    actuals: dict
+    dispatch: dict
+    supervisor: dict
+    battery_energy_mwh: float
+    battery_soc_pct: float
+
+    model_config = {"from_attributes": True}

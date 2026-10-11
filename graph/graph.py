@@ -39,9 +39,13 @@ def get_checkpointer() -> PostgresSaver:
     with _init_lock:
         if _checkpointer is not None:
             return _checkpointer
-        pool = ConnectionPool(_pg_conn_string(), min_size=1, max_size=5)
+        conn_str = _pg_conn_string()
+        pool = ConnectionPool(conn_str, min_size=1, max_size=5)
         cp = PostgresSaver(pool)
-        cp.setup()
+        try:
+            cp.setup()
+        except Exception:
+            pass
         _checkpointer = cp
         return _checkpointer
 

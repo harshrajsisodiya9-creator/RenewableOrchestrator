@@ -235,12 +235,12 @@ def monitor(state: State) -> dict:
 
     # ── aggregate headroom gap (MW-consistent) ────────────────────────────
     max_discharge = state.get("battery_max_discharge_mw", 0.0)
-    line_limit = state.get("line_limit_mw", 150.0)
+    line_limit = state.get("line_limit_mw", 0.0)
     reserve_pct = state.get("reserve_target_pct", state.get("reserve_floor_pct", 20.0))
-    capacity_mwh = state.get("battery_capacity_mwh", 400.0)
+    capacity_mwh = state.get("battery_capacity_mwh", 0.0)
     battery_energy = state.get("battery_energy_mwh", 0.0)
 
-    reserve_energy_mwh = reserve_pct / 100.0 * capacity_mwh
+    reserve_energy_mwh = reserve_pct / 100.0 * capacity_mwh if capacity_mwh > 0 else 0.0
     energy_above_reserve = max(0.0, battery_energy - reserve_energy_mwh)
     available_discharge_mw = min(max_discharge, energy_above_reserve / INTERVAL_HOURS)
 

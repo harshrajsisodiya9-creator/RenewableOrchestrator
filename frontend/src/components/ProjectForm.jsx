@@ -76,17 +76,24 @@ export default function ProjectForm({ onCreated }) {
     const errs = {};
     if (!name.trim()) errs.name = "Project name is required";
 
-    const hasSolar = solarFarms.some((s) => s.id && s.power_output_mw);
-    const hasWind = windFarms.some((w) => w.id && w.power_output_mw);
-    if (!hasSolar && !hasWind) {
-      errs.farms = "At least one solar or wind farm is required";
-    }
-
     const hasConsumer = consumers.some(
       (c) => c.id && c.day_load_mw && c.night_load_mw
     );
     if (!hasConsumer) {
       errs.consumers = "At least one consumer is required";
+    }
+
+    const lineLimit = grid.line_limit_mw === "" ? null : Number(grid.line_limit_mw);
+    if (lineLimit === null || isNaN(lineLimit) || lineLimit < 0) {
+      errs.grid_limit = "Line limit is required (>= 0, 0 = islanded)";
+    }
+
+    const hasSolar = solarFarms.some((s) => s.id && s.power_output_mw);
+    const hasWind = windFarms.some((w) => w.id && w.power_output_mw);
+    const hasBattery = batteries.some((b) => b.id && b.capacity_mwh && b.max_rate_mw);
+    const hasGridImport = lineLimit > 0;
+    if (!hasSolar && !hasWind && !hasBattery && !hasGridImport) {
+      errs.supply = "Need at least one supply path: a farm, battery, or line limit > 0";
     }
 
     solarFarms.forEach((sf, i) => {
@@ -123,8 +130,6 @@ export default function ProjectForm({ onCreated }) {
         errs[`con_${i}_end`] = "HH:MM format";
     });
 
-    if (grid.line_limit_mw && Number(grid.line_limit_mw) <= 0)
-      errs.grid_limit = "Must be > 0";
 
     const allIds = collectAllIds().filter(Boolean);
     const seen = new Set();
@@ -186,14 +191,12 @@ export default function ProjectForm({ onCreated }) {
         })),
     };
 
-    if (grid.line_limit_mw) {
-      payload.grid = {
-        line_limit_mw: Number(grid.line_limit_mw),
-        buy_premium_per_kwh: Number(grid.buy_premium_per_kwh) || 0,
-        price_cap_per_kwh: Number(grid.price_cap_per_kwh) || 0,
-        emission_tco2_per_mwh: Number(grid.emission_tco2_per_mwh) || 0,
-      };
-    }
+    payload.grid = {
+      line_limit_mw: Number(grid.line_limit_mw) || 0,
+      buy_premium_per_kwh: Number(grid.buy_premium_per_kwh) || 0,
+      price_cap_per_kwh: Number(grid.price_cap_per_kwh) || 0,
+      emission_tco2_per_mwh: Number(grid.emission_tco2_per_mwh) || 0,
+    };
 
     try {
       await createProjectFull(payload);
@@ -244,6 +247,9 @@ export default function ProjectForm({ onCreated }) {
       {error && <div className="form-error">{error}</div>}
       {fieldErrors.duplicates && (
         <div className="form-error">{fieldErrors.duplicates}</div>
+      )}
+      {fieldErrors.supply && (
+        <div className="form-error">{fieldErrors.supply}</div>
       )}
 
       <label>

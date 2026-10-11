@@ -84,7 +84,8 @@ def run_graph_loop(project_name: str) -> None:
 
     if data_source == "db" and project_id is not None:
         init_data_collector_db(
-            project_id, cfg["solar_farms"], cfg["wind_farms"]
+            project_id, cfg["solar_farms"], cfg["wind_farms"],
+            wind_physics=cfg.get("wind"),
         )
 
     use_checkpointer = data_source == "db"

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import Float, ForeignKey, Integer, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.database import Base
@@ -130,3 +132,57 @@ class AssetStatus(Base):
     tripped_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     restore_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reason: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class Event(Base):
+    __tablename__ = "event"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    targets: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    start_time: Mapped[str] = mapped_column(String, nullable=False)
+    end_time: Mapped[str] = mapped_column(String, nullable=False)
+    wind_speed_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    line_derate_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pct_drop: Mapped[float | None] = mapped_column(Float, nullable=True)
+    extra_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
+    multiplier: Mapped[float | None] = mapped_column(Float, nullable=True)
+    visibility: Mapped[str] = mapped_column(String, nullable=False, default="alerted")
+    alert_time: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str] = mapped_column(String, nullable=False, default="manual")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class TickResult(Base):
+    __tablename__ = "tick_result"
+    __table_args__ = (
+        UniqueConstraint("project_id", "tick", name="uq_tick_result"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
+    tick: Mapped[int] = mapped_column(Integer, nullable=False)
+    timestamp: Mapped[str] = mapped_column(String, nullable=False, default="00:00")
+    actuals: Mapped[dict] = mapped_column(JSON, nullable=False)
+    dispatch: Mapped[dict] = mapped_column(JSON, nullable=False)
+    supervisor: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    battery_energy_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    battery_soc_pct: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class RunSession(Base):
+    __tablename__ = "run_session"
+    __table_args__ = (
+        UniqueConstraint("project_id", name="uq_run_session_project"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="idle")
+    current_tick: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    mode: Mapped[str] = mapped_column(String, nullable=False, default="reliability")
+    seed: Mapped[int] = mapped_column(Integer, nullable=False, default=42)
+    scenario: Mapped[str] = mapped_column(String, nullable=False, default="blank")
+    speed: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

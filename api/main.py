@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import Base, engine
-from api.routes import assets, factories, grids, inject, projects
+from api.routes import assets, events, factories, grids, inject, projects, simulation
 
 
 @asynccontextmanager
@@ -33,6 +33,8 @@ app.include_router(assets.router)
 app.include_router(factories.router)
 app.include_router(grids.router)
 app.include_router(inject.router)
+app.include_router(events.router)
+app.include_router(simulation.router)
 
 
 @app.get("/health")

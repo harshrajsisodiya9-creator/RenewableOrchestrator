@@ -1,11 +1,16 @@
-"""LangGraph node: records the tick's full snapshot into tick_log."""
+"""LangGraph node: records the tick's full snapshot into tick_log and appends to a .jsonl file."""
 
 from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
 
 from graph.models.state import Action, State
 
 DT = 0.25
 EMISSION_TCO2_PER_MWH = 0.71
+LOGS_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
 
 
 def logger(state: State) -> dict:
@@ -43,6 +48,17 @@ def logger(state: State) -> dict:
         "supervisor_called": state.get("should_call_supervisor", False),
     }
 
+    _write_to_file(state, entry)
+
     existing = list(state.get("tick_log", []))
     existing.append(entry)
     return {"tick_log": existing}
+
+
+def _write_to_file(state: State, entry: dict) -> None:
+    project_id = state.get("project_id", "unknown")
+    session_id = state.get("session_id", "unknown")
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    path = LOGS_DIR / f"project_{project_id}_session_{session_id}.jsonl"
+    with open(path, "a") as f:
+        f.write(json.dumps(entry, default=str) + "\n")

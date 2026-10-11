@@ -59,6 +59,11 @@ def load_config_from_db(project_name: str) -> dict:
             cfg["battery"]["capacity_mwh"] = sum(b.total_capacity_mw for b in batteries)
             cfg["battery"]["max_charge_mw"] = sum(b.charge_discharge_rate_mwh for b in batteries)
             cfg["battery"]["max_discharge_mw"] = sum(b.charge_discharge_rate_mwh for b in batteries)
+        else:
+            cfg["battery"]["capacity_mwh"] = 0.0
+            cfg["battery"]["max_charge_mw"] = 0.0
+            cfg["battery"]["max_discharge_mw"] = 0.0
+            cfg["battery"]["soc_init_pct"] = 0.0
 
         factories = (
             db.query(Factory)
@@ -85,6 +90,13 @@ def load_config_from_db(project_name: str) -> dict:
                 "buy_premium_per_kwh": grid.buy_premium_per_kwh,
                 "price_cap_per_kwh": grid.price_cap_per_kwh,
                 "emission_tco2_per_mwh": grid.emission_tco2_per_mwh,
+            }
+        else:
+            cfg["grid"] = {
+                "line_limit_mw": 0.0,
+                "buy_premium_per_kwh": 0.0,
+                "price_cap_per_kwh": 10.0,
+                "emission_tco2_per_mwh": 0.0,
             }
 
         cfg["_project_id"] = project.id
