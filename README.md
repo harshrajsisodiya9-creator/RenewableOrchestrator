@@ -211,7 +211,36 @@ LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 ---
 
 ## Running the project
+The backend and the LangGraph checkpointer both need PostgreSQL running before you start the server.
 
+```bash
+# Linux (systemd)
+sudo systemctl start postgresql
+sudo systemctl enable postgresql      # optional: start automatically on boot
+
+# macOS (Homebrew)
+brew services start postgresql@16
+
+# Windows (PowerShell as Administrator; adjust the service name to your version)
+net start postgresql-x64-16
+```
+
+Check that it is accepting connections:
+
+```bash
+pg_isready -h localhost -p 5432
+# expected: localhost:5432 - accepting connections
+```
+
+If you don't have PostgreSQL installed, you can run it in Docker instead:
+
+```bash
+docker run -d --name energy-db -p 5432:5432 \
+  -e POSTGRES_PASSWORD=your_password -e POSTGRES_DB=energy \
+  postgres:16
+```
+
+Use the same user, password and database name in `DATABASE_URL` in `.env`.
 Open two terminals from the project root.
 
 **Terminal 1 — backend API (port 8000)**
